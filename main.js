@@ -4,15 +4,17 @@ const stationOrder = [
   "Breton", "Carrot Creek", "Drayton Valley", "Edson", "Genesee", "Hinton-Drinnan", "Hinton-Hillcrest",
   "Steeper", "Meadows", "Wagner2", "Jasper"
 ];
+
 const edmontonZone = luxon.IANAZone.create("America/Edmonton");
 
 async function loadCSV(url) {
   const res = await fetch(url);
   const text = await res.text();
+  const delimiter = text.includes('\t') ? '\t' : ',';
   const [headerLine, ...lines] = text.trim().split('\n');
-  const headers = headerLine.split(',');
+  const headers = headerLine.split(delimiter);
   return lines.map(line => {
-    const row = line.split(',');
+    const row = line.split(delimiter);
     return Object.fromEntries(row.map((v, i) => [headers[i], v]));
   });
 }
@@ -36,6 +38,9 @@ async function buildTable() {
     const param = d.ParameterName;
     const val = d.Value;
     const dt = new Date(d.ReadingDate);
+
+    if (!param || param.trim() === "") return; // skip blank parameter names
+
     const key = `${station}__${param}`;
 
     if (!latestTimes[station] || dt > latestTimes[station]) {
@@ -58,14 +63,19 @@ async function buildTable() {
       const key = `${station}__${param}`;
       let status = "";
 
+      const expected = equipment.some(e => e.StationName === station && e.ParameterName === param);
+
+      if (!expected) {
+        html += `<td></td>`;
+        return;
+      }
+
       if (brokenKeys.has(key)) {
         status = "offline";
       } else if (live[key] && live[key].value && live[key].value !== "-888") {
         status = "ok";
       } else {
-        // Only mark as missing if expected in equipment.csv
-        const isExpected = equipment.find(e => e.StationName === station && e.ParameterName === param);
-        status = isExpected ? "missing" : "";
+        status = "missing";
       }
 
       const dot = status ? `<span class="cell ${status}"></span>` : "";
