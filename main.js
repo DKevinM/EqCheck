@@ -1,9 +1,25 @@
+const stationOrder = [
+  "Edmonton McCauley", "St. Albert", "Woodcroft", "Edmonton East", "Edmonton Lendrum", "O’Morrow Station 1",
+  "Poacher’s Landing Station 2", "Enoch", "Leduc Sensor", "Ardrossan", "Sherwood Park",
+  "Breton", "Carrot Creek", "Drayton Valley", "Edson", "Genesee", "Hinton-Drinnan", "Hinton-Hillcrest",
+  "Steeper", "Meadows", "Wagner2", "Jasper"
+];
+const edmontonZone = luxon.IANAZone.create("America/Edmonton");
+
 async function loadCSV(url) {
-  const response = await fetch(url);
-  const text = await response.text();
-  const rows = text.trim().split('\n').map(r => r.split(','));
-  const headers = rows[0];
-  return rows.slice(1).map(row => Object.fromEntries(row.map((v, i) => [headers[i], v])));
+  const res = await fetch(url);
+  const text = await res.text();
+  const [headerLine, ...lines] = text.trim().split('\n');
+  const headers = headerLine.split(',');
+  return lines.map(line => {
+    const row = line.split(',');
+    return Object.fromEntries(row.map((v, i) => [headers[i], v]));
+  });
+}
+
+function formatEdmontonTime(utcString) {
+  const dt = luxon.DateTime.fromISO(utcString, { zone: 'utc' }).setZone(edmontonZone);
+  return dt.toFormat("yyyy-MM-dd HH:mm");
 }
 
 async function buildTable() {
@@ -11,58 +27,55 @@ async function buildTable() {
   const broken = await loadCSV("https://raw.githubusercontent.com/DKevinM/AB_datapull/main/data/station_parameters.csv");
   const latest = await loadCSV("https://raw.githubusercontent.com/DKevinM/AB_datapull/main/data/last6h.csv");
 
-  const status = {};
-
-  // Find latest time per station
+  const brokenKeys = new Set(broken.map(b => `${b.StationName}__${b.ParameterName}`));
   const latestTimes = {};
+  const live = {};
+
   latest.forEach(d => {
-    const key = d.StationName;
-    const t = new Date(d.ReadingDate);
-    if (!latestTimes[key] || t > latestTimes[key]) latestTimes[key] = t;
-  });
+    const station = d.StationName;
+    const param = d.ParameterName;
+    const val = d.Value;
+    const dt = new Date(d.ReadingDate);
+    const key = `${station}__${param}`;
 
-  // Build status per expected param
-  equipment.forEach(e => {
-    const key = e.StationName;
-    const param = e.ParameterName;
-    const cellKey = `${key}__${param}`;
-
-    const knownDown = broken.some(b => b.StationName === key && b.ParameterName === param);
-    if (knownDown) {
-      status[cellKey] = "offline";
-      return;
+    if (!latestTimes[station] || dt > latestTimes[station]) {
+      latestTimes[station] = dt;
     }
 
-    const report = latest.find(d => d.StationName === key && d.ParameterName === param &&
-                                     new Date(d.ReadingDate).getTime() === latestTimes[key]?.getTime());
-
-    if (report && report.Value !== "" && report.Value !== "-888") {
-      status[cellKey] = "ok";
-    } else {
-      status[cellKey] = "missing";
-    }
+    live[key] = { value: val, time: dt };
   });
 
-  // Get all unique stations and parameters
-  const stations = [...new Set(equipment.map(d => d.StationName))];
-  const parameters = [...new Set(equipment.map(d => d.ParameterName))];
+  const parameters = [...new Set(equipment.map(e => e.ParameterName))];
 
-  // Build HTML table
-  let html = `<table><thead><tr><th>Station</th><th>ReadingDate</th>`;
+  let html = `<table><thead><tr><th>Station</th><th>Last Seen (MT)</th>`;
   parameters.forEach(p => html += `<th>${p}</th>`);
   html += `</tr></thead><tbody>`;
 
-  stations.forEach(s => {
-    html += `<tr><td>${s}</td><td>${latestTimes[s]?.toISOString().slice(0,16).replace('T',' ') || '-'}</td>`;
-    parameters.forEach(p => {
-      const val = status[`${s}__${p}`] || "";
-      html += `<td class="${val}">${val ? "●" : ""}</td>`;
+  stationOrder.forEach(station => {
+    html += `<tr><td>${station}</td><td>${latestTimes[station] ? formatEdmontonTime(latestTimes[station].toISOString()) : "-"}</td>`;
+
+    parameters.forEach(param => {
+      const key = `${station}__${param}`;
+      let status = "";
+
+      if (brokenKeys.has(key)) {
+        status = "offline";
+      } else if (live[key] && live[key].value && live[key].value !== "-888") {
+        status = "ok";
+      } else {
+        // Only mark as missing if expected in equipment.csv
+        const isExpected = equipment.find(e => e.StationName === station && e.ParameterName === param);
+        status = isExpected ? "missing" : "";
+      }
+
+      const dot = status ? `<span class="cell ${status}"></span>` : "";
+      html += `<td>${dot}</td>`;
     });
+
     html += `</tr>`;
   });
 
   html += `</tbody></table>`;
-
   document.getElementById("table-container").innerHTML = html;
 }
 
