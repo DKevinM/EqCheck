@@ -1,20 +1,25 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Equipment Status Matrix</title>
+  <meta charset="UTF-8">
+  <title>Air Monitoring Equipment Status</title>
+  <script src="https://cdn.jsdelivr.net/npm/luxon@3/build/global/luxon.min.js"></script>
   <style>
-    table { border-collapse: collapse; width: 100%; }
-    th, td { padding: 6px; text-align: center; border: 1px solid #ccc; }
+    body { font-family: Arial, sans-serif; padding: 10px; }
+    h2 { text-align: center; }
+    table { border-collapse: collapse; width: 100%; font-size: 14px; }
+    th, td { border: 1px solid #ccc; padding: 6px; text-align: center; }
+    th { position: sticky; top: 0; background-color: #f8f8f8; }
     .ok { background-color: green; color: white; }
     .missing { background-color: red; color: white; }
     .offline { background-color: gray; color: white; }
+    .cell { width: 18px; height: 18px; display: inline-block; border-radius: 50%; }
+    .scroll-box { overflow-x: auto; }
   </style>
 </head>
 <body>
-  <h2>Live Equipment Status</h2>
-  <div id="table-container">Loading...</div>
+  <h2>Air Monitoring Equipment Status</h2>
+  <div class="scroll-box" id="table-container">Loading...</div>
   <script src="main.js"></script>
 </body>
 </html>
