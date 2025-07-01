@@ -49,7 +49,7 @@
   <script>
   const stationOrder = [
     "Edmonton McCauley", "St. Albert", "Woodcroft", "Edmonton East", "Edmonton Lendrum",
-    "O'Morrow Station 1", "Poacher's Landing Station 2", "Enoch", "Leduc Sensor", "Ardrossan",
+    "O’Morrow Station 1", "Poacher’s Landing Station 2", "Enoch", "Leduc Sensor", "Ardrossan",
     "Sherwood Park", "Breton", "Carrot Creek", "Drayton Valley", "Edson", "Genesee",
     "Hinton-Drinnan", "Hinton-Hillcrest", "Steeper", "Meadows", "Wagner2", "Jasper"
   ];
@@ -138,7 +138,7 @@ async function buildTable() {
       if (brokenKeys.has(key)) {
         html += `<td><span class="cell offline" title="Intentionally Offline"></span></td>`;
       } else if (live[key]) {
-        html += `<td><span class="cell ok" title="${live[key].value}"></span></td>`;
+        html += `<td><span class="cell ok" title="${val}"></span><span style="font-size: 10px; margin-left: 3px;">${val}</span></td>`;
       } else {
         html += `<td><span class="cell missing" title="Expected but not reporting"></span></td>`;
       }
