@@ -1,25 +1,79 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
   <meta charset="UTF-8">
-  <title>Air Monitoring Equipment Status</title>
-  <script src="https://cdn.jsdelivr.net/npm/luxon@3/build/global/luxon.min.js"></script>
+  <title>Equipment Status Matrix</title>
   <style>
-    body { font-family: Arial, sans-serif; padding: 10px; }
-    h2 { text-align: center; }
+    body { font-family: sans-serif; padding: 20px; }
     table { border-collapse: collapse; width: 100%; font-size: 14px; }
-    th, td { border: 1px solid #ccc; padding: 6px; text-align: center; }
-    th { position: sticky; top: 0; background-color: #f8f8f8; }
-    .ok { background-color: green; color: white; }
-    .missing { background-color: red; color: white; }
-    .offline { background-color: gray; color: white; }
-    .cell { width: 18px; height: 18px; display: inline-block; border-radius: 50%; }
-    .scroll-box { overflow-x: auto; }
+    th, td { border: 1px solid #ccc; padding: 4px; text-align: center; }
+    .ok { background: green; color: white; }
+    .missing { background: red; color: white; }
+    .offline { background: gray; color: white; }
   </style>
 </head>
 <body>
-  <h2>Air Monitoring Equipment Status</h2>
-  <div class="scroll-box" id="table-container">Loading...</div>
-  <script src="main.js"></script>
+  <h2>Station Equipment Status (Live)</h2>
+  <div id="statusTable">Loading...</div>
+
+  <script>
+    const EQUIPMENT_URL = "https://raw.githubusercontent.com/DKevinM/AB_datapull/main/data/equipment.csv";
+    const LAST6H_URL = "https://raw.githubusercontent.com/DKevinM/AB_datapull/main/data/last6h.csv";
+    const OFFLINE_URL = "https://raw.githubusercontent.com/DKevinM/AB_datapull/main/data/station_parameters.csv";
+
+    async function loadCSV(url) {
+      const res = await fetch(url);
+      const text = await res.text();
+      const rows = text.trim().split('\n').map(r => r.split(','));
+      const headers = rows[0];
+      return rows.slice(1).map(r => Object.fromEntries(r.map((v, i) => [headers[i], v])));
+    }
+
+    async function main() {
+      const equipment = await loadCSV(EQUIPMENT_URL);
+      const latest = await loadCSV(LAST6H_URL);
+      const offline = await loadCSV(OFFLINE_URL);
+
+      // Unique parameter and station lists
+      const parameters = [...new Set(equipment.map(d => d.ParameterName))];
+      const stations = [...new Set(equipment.map(d => d.StationName))];
+
+      // Fast lookup sets
+      const reported = new Set(latest.map(d => `${d.StationName}__${d.ParameterName}`));
+      const offlineKeys = new Set(offline.map(d => `${d.StationName}__${d.ParameterName}`));
+
+      // Build matrix HTML
+      let html = "<table><thead><tr><th>Station</th>";
+      parameters.forEach(p => html += `<th>${p}</th>`);
+      html += "</tr></thead><tbody>";
+
+      stations.forEach(st => {
+        html += `<tr><td>${st}</td>`;
+        parameters.forEach(p => {
+          const expected = equipment.some(e => e.StationName === st && e.ParameterName === p);
+          if (!expected) {
+            html += "<td></td>";
+          } else {
+            const key = `${st}__${p}`;
+            let cls = "missing", symbol = "✖";
+            if (offlineKeys.has(key)) {
+              cls = "offline";
+              symbol = "●";
+            } else if (reported.has(key)) {
+              cls = "ok";
+              symbol = "✔";
+            }
+            html += `<td class="${cls}">${symbol}</td>`;
+          }
+        });
+        html += "</tr>";
+      });
+
+      html += "</tbody></table>";
+      document.getElementById("statusTable").innerHTML = html;
+    }
+
+    main();
+  </script>
 </body>
 </html>
