@@ -97,24 +97,31 @@ async function buildTable() {
   const latestTimes = {};
   const live = {};
 
-  latest.forEach(d => {
-    const station = d.StationName;
-    const param = d.ParameterName;
-    const dt = new Date(d.ReadingDate);
+// Sort latest by timestamp (newest first)
+latest.sort((a, b) => new Date(b.ReadingDate) - new Date(a.ReadingDate));
+  
+latest.forEach(d => {
+  const station = d.StationName;
+  const param = d.ParameterName;
+  const dt = new Date(d.ReadingDate);
 
-    let v = parseFloat(d.Value);
-    if (["Ozone", "Total Oxides of Nitrogen", "Hydrogen Sulphide", "Total Reduced Sulphur", "Sulphur Dioxide", "Nitric Oxide", "Nitrogen Dioxide"].includes(param)) {
-      v *= 1000;
-    }
-    if (isNaN(v) || d.Value === "-888") return;
+  let v = parseFloat(d.Value);
+  if (["Ozone", "Total Oxides of Nitrogen", "Hydrogen Sulphide", "Total Reduced Sulphur", "Sulphur Dioxide", "Nitric Oxide", "Nitrogen Dioxide"].includes(param)) {
+    v *= 1000;
+  }
+  if (isNaN(v) || d.Value === "-888") return;
 
-    const key = `${station}__${param}`;
+  const key = `${station}__${param}`;
+
+  // ✅ Only use the most recent value per station+param
+  if (!live[key]) {
     live[key] = { value: v, time: dt };
+  }
 
-    if (!latestTimes[station] || dt > latestTimes[station]) {
-      latestTimes[station] = dt;
-    }
-  });
+  if (!latestTimes[station] || dt > latestTimes[station]) {
+    latestTimes[station] = dt;
+  }
+});
 
   let html = `<table><thead><tr><th>Station</th><th>Last Seen (MT)</th>`;
   parameterOrder.forEach(param => {
