@@ -29,15 +29,15 @@
       border-radius: 50%;
     }
 
-    .ok {
+    .cell.ok {
       background-color: green;
     }
-
-    .missing {
+    
+    .cell.missing {
       background-color: red;
     }
-
-    .offline {
+    
+    .cell.offline {
       background-color: gray;
     }
   </style>
@@ -53,7 +53,31 @@
       "Breton", "Carrot Creek", "Drayton Valley", "Edson", "Genesee", "Hinton-Drinnan", "Hinton-Hillcrest",
       "Steeper", "Meadows", "Wagner2", "Jasper"
     ];
+    const parameterOrder = [
+      "Sulphur Dioxide", "Hydrogen Sulphide", "Total Reduced Sulphur", "Total Oxides of Nitrogen", "Nitrogen Dioxide",
+      "Nitric Oxide", "Fine Particulate Matter", "Ozone", "Carbon Monoxide", "Total Hydrocarbons", "Methane", "Non-methane Hydrocarbons",
+      "Wind Speed", "Wind Direction", "Outdoor Temperature", "Relative Humidity"
+    ];
 
+    const parameterShortNames = {
+      "Sulphur Dioxide": "SO₂",
+      "Hydrogen Sulphide": "H₂S",
+      "Total Reduced Sulphur": "TRS",
+      "Total Oxides of Nitrogen": "NOₓ",
+      "Nitrogen Dioxide": "NO₂",
+      "Nitric Oxide": "NO",
+      "Fine Particulate Matter": "PM2.5",
+      "Ozone": "O₃",
+      "Carbon Monoxide": "CO",
+      "Total Hydrocarbons": "THC",
+      "Methane": "CH₄",
+      "Non-methane Hydrocarbons": "NMHC",
+      "Wind Speed": "WS",
+      "Wind Direction": "WD",
+      "Outdoor Temperature": "Temp",
+      "Relative Humidity": "RH"
+    };
+    
     const edmontonZone = luxon.IANAZone.create("America/Edmonton");
 
     async function loadCSV(url) {
@@ -75,69 +99,69 @@
       return dt.toFormat("yyyy-MM-dd HH:mm");
     }
 
-    async function buildTable() {
-      const equipment = await loadCSV("https://raw.githubusercontent.com/DKevinM/AB_datapull/main/data/equipment.csv");
-      const broken = await loadCSV("https://raw.githubusercontent.com/DKevinM/AB_datapull/main/data/station_parameters.csv");
-      const latest = await loadCSV("https://raw.githubusercontent.com/DKevinM/AB_datapull/main/data/last6h.csv");
+async function buildTable() {
+  const equipment = await loadCSV("https://raw.githubusercontent.com/DKevinM/AB_datapull/main/data/equipment.csv");
+  const broken = await loadCSV("https://raw.githubusercontent.com/DKevinM/AB_datapull/main/data/station_parameters.csv");
+  const latest = await loadCSV("https://raw.githubusercontent.com/DKevinM/AB_datapull/main/data/last6h.csv");
 
-      const brokenKeys = new Set(broken.map(b => `${b.StationName}__${b.ParameterName}`));
-      const latestTimes = {};
-      const live = {};
+  const brokenKeys = new Set(broken.map(b => `${b.StationName}__${b.ParameterName}`));
+  const expectedEquipment = new Set(equipment.map(e => `${e.StationName}__${e.ParameterName}`));
 
-      latest.forEach(d => {
-        const station = d.StationName;
-        const param = d.ParameterName;
-        const val = d.Value;
-        const dt = new Date(d.ReadingDate);
+  const latestTimes = {};
+  const live = {};
 
-        if (!param || param.trim() === "") return;
+  latest.forEach(d => {
+    const station = d.StationName;
+    const param = d.ParameterName;
+    const val = d.Value;
+    const dt = new Date(d.ReadingDate);
 
-        const key = `${station}__${param}`;
+    const key = `${station}__${param}`;
 
-        if (!latestTimes[station] || dt > latestTimes[station]) {
-          latestTimes[station] = dt;
-        }
-
-        live[key] = { value: val, time: dt };
-      });
-
-      const parameters = [...new Set(equipment.map(e => e.ParameterName))];
-
-      let html = `<table><thead><tr><th>Station</th><th>Last Seen (MT)</th>`;
-      parameters.forEach(p => html += `<th>${p}</th>`);
-      html += `</tr></thead><tbody>`;
-
-      stationOrder.forEach(station => {
-        html += `<tr><td>${station}</td><td>${latestTimes[station] ? formatEdmontonTime(latestTimes[station].toISOString()) : "-"}</td>`;
-
-        parameters.forEach(param => {
-          const key = `${station}__${param}`;
-          let status = "";
-
-          const expected = equipment.some(e => e.StationName === station && e.ParameterName === param);
-
-          if (!expected) {
-            html += `<td></td>`;
-            return;
-          }
-
-          if (brokenKeys.has(key)) {
-            status = "offline";
-          } else if (live[key] && live[key].value && live[key].value !== "-888") {
-            status = "ok";
-          } else {
-            status = "missing";
-          }
-
-          html += `<td><span class="cell ${status}" title="${param}"></span></td>`;
-        });
-
-        html += `</tr>`;
-      });
-
-      html += `</tbody></table>`;
-      document.getElementById("table-container").innerHTML = html;
+    // Track most recent timestamp per station
+    if (!latestTimes[station] || dt > latestTimes[station]) {
+      latestTimes[station] = dt;
     }
+
+    live[key] = { value: val, time: dt };
+  });
+
+  let html = `<table><thead><tr><th>Station</th><th>Last Seen (MT)</th>`;
+  parameterOrder.forEach(param => {
+    const shortLabel = parameterShortNames[param] || param;
+    html += `<th>${shortLabel}</th>`;
+  });
+  html += `</tr></thead><tbody>`;
+
+  stationOrder.forEach(station => {
+    html += `<tr><td>${station}</td><td>${latestTimes[station] ? formatEdmontonTime(latestTimes[station].toISOString()) : "-"}</td>`;
+
+    parameterOrder.forEach(param => {
+      const key = `${station}__${param}`;
+      const expected = expectedEquipment.has(key);
+
+      if (!expected) {
+        html += `<td></td>`;
+        return;
+      }
+
+      if (brokenKeys.has(key)) {
+        html += `<td><span class="cell offline" title="Intentionally Offline"></span></td>`;
+      } else if (live[key] && live[key].value && live[key].value !== "-888") {
+        const val = live[key].value;
+        html += `<td><span class="cell ok" title="${val}"></span></td>`;
+      } else {
+        html += `<td><span class="cell missing" title="Expected but not reporting"></span></td>`;
+      }
+    });
+
+    html += `</tr>`;
+  });
+
+  html += `</tbody></table>`;
+  document.getElementById("table-container").innerHTML = html;
+}
+
 
     buildTable();
   </script>
