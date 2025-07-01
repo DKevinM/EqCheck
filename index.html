@@ -138,7 +138,7 @@ async function buildTable() {
       if (brokenKeys.has(key)) {
         html += `<td><span class="cell offline" title="Intentionally Offline"></span></td>`;
       } else if (live[key]) {
-        const val = live[key].value;
+        const val = parseFloat(live[key].value).toFixed(1);
         html += `<td><span class="cell ok" title="${val}"></span><span style="font-size: 10px; margin-left: 3px;">${val}</span></td>`;
       } else {
         html += `<td><span class="cell missing" title="Expected but not reporting"></span></td>`;
