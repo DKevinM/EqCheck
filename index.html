@@ -38,7 +38,7 @@
     }
     
     .cell.offline {
-      background-color: gray;
+      background-color: black;
     }
   </style>
 </head>
@@ -47,57 +47,45 @@
   <div id="table-container">Loading...</div>
 
   <script>
-    const stationOrder = [
-      "Edmonton McCauley", "St. Albert", "Woodcroft", "Edmonton East", "Edmonton Lendrum", "O’Morrow Station 1",
-      "Poacher’s Landing Station 2", "Enoch", "Leduc Sensor", "Ardrossan", "Sherwood Park",
-      "Breton", "Carrot Creek", "Drayton Valley", "Edson", "Genesee", "Hinton-Drinnan", "Hinton-Hillcrest",
-      "Steeper", "Meadows", "Wagner2", "Jasper"
-    ];
-    const parameterOrder = [
-      "Sulphur Dioxide", "Hydrogen Sulphide", "Total Reduced Sulphur", "Total Oxides of Nitrogen", "Nitrogen Dioxide",
-      "Nitric Oxide", "Fine Particulate Matter", "Ozone", "Carbon Monoxide", "Total Hydrocarbons", "Methane", "Non-methane Hydrocarbons",
-      "Wind Speed", "Wind Direction", "Outdoor Temperature", "Relative Humidity"
-    ];
-
-    const parameterShortNames = {
-      "Sulphur Dioxide": "SO₂",
-      "Hydrogen Sulphide": "H₂S",
-      "Total Reduced Sulphur": "TRS",
-      "Total Oxides of Nitrogen": "NOₓ",
-      "Nitrogen Dioxide": "NO₂",
-      "Nitric Oxide": "NO",
-      "Fine Particulate Matter": "PM2.5",
-      "Ozone": "O₃",
-      "Carbon Monoxide": "CO",
-      "Total Hydrocarbons": "THC",
-      "Methane": "CH₄",
-      "Non-methane Hydrocarbons": "NMHC",
-      "Wind Speed": "WS",
-      "Wind Direction": "WD",
-      "Outdoor Temperature": "Temp",
-      "Relative Humidity": "RH"
-    };
+  const stationOrder = [
+    "Edmonton McCauley", "St. Albert", "Woodcroft", "Edmonton East", "Edmonton Lendrum",
+    "O'Morrow Station 1", "Poacher's Landing Station 2", "Enoch", "Leduc Sensor", "Ardrossan",
+    "Sherwood Park", "Breton", "Carrot Creek", "Drayton Valley", "Edson", "Genesee",
+    "Hinton-Drinnan", "Hinton-Hillcrest", "Steeper", "Meadows", "Wagner2", "Jasper"
+  ];
+  
+  const parameterOrder = [
+    "Sulphur Dioxide", "Hydrogen Sulphide", "Total Reduced Sulphur", "Total Oxides of Nitrogen", "Nitrogen Dioxide",
+    "Nitric Oxide", "Fine Particulate Matter", "Ozone", "Carbon Monoxide", "Total Hydrocarbons", "Methane", "Non-methane Hydrocarbons",
+    "Wind Speed", "Wind Direction", "Outdoor Temperature", "Relative Humidity"
+  ];
+  
+  const parameterShortNames = {
+    "Sulphur Dioxide": "SO₂", "Hydrogen Sulphide": "H₂S", "Total Reduced Sulphur": "TRS",
+    "Total Oxides of Nitrogen": "NOₓ", "Nitrogen Dioxide": "NO₂", "Nitric Oxide": "NO",
+    "Fine Particulate Matter": "PM2.5", "Ozone": "O₃", "Carbon Monoxide": "CO",
+    "Total Hydrocarbons": "THC", "Methane": "CH₄", "Non-methane Hydrocarbons": "NMHC",
+    "Wind Speed": "WS", "Wind Direction": "WD", "Outdoor Temperature": "Temp", "Relative Humidity": "RH"
+  };
     
-    const edmontonZone = luxon.IANAZone.create("America/Edmonton");
+  const edmontonZone = luxon.IANAZone.create("America/Edmonton");
 
-    async function loadCSV(url) {
-      const res = await fetch(url);
-      const text = await res.text();
-    
-      const cleaned = text.replace(/^\uFEFF/, "");  // remove BOM if present
-      const [headerLine, ...lines] = cleaned.trim().split('\n');
-      const headers = headerLine.split(',').map(h => h.trim());
-    
-      return lines.map(line => {
-        const row = line.split(',').map(v => v.trim());
-        return Object.fromEntries(row.map((val, i) => [headers[i], val]));
-      });
-    }
+  async function loadCSV(url) {
+    const res = await fetch(url);
+    const text = await res.text();
+    const cleaned = text.replace(/^\uFEFF/, "");
+    const [headerLine, ...lines] = cleaned.trim().split('\n');
+    const headers = headerLine.split(',').map(h => h.trim());
+    return lines.map(line => {
+      const row = line.split(',').map(v => v.trim());
+      return Object.fromEntries(row.map((val, i) => [headers[i], val]));
+    });
+  }
 
-    function formatEdmontonTime(utcString) {
-      const dt = luxon.DateTime.fromISO(utcString, { zone: 'utc' }).setZone(edmontonZone);
-      return dt.toFormat("yyyy-MM-dd HH:mm");
-    }
+function formatEdmontonTime(utcString) {
+  const dt = luxon.DateTime.fromISO(utcString, { zone: 'utc' }).setZone(edmontonZone);
+  return dt.toFormat("yyyy-MM-dd HH:mm");
+}
 
 async function buildTable() {
   const equipment = await loadCSV("https://raw.githubusercontent.com/DKevinM/AB_datapull/main/data/equipment.csv");
@@ -106,24 +94,26 @@ async function buildTable() {
 
   const brokenKeys = new Set(broken.map(b => `${b.StationName}__${b.ParameterName}`));
   const expectedEquipment = new Set(equipment.map(e => `${e.StationName}__${e.ParameterName}`));
-
   const latestTimes = {};
   const live = {};
 
   latest.forEach(d => {
     const station = d.StationName;
     const param = d.ParameterName;
-    const val = d.Value;
     const dt = new Date(d.ReadingDate);
 
-    const key = `${station}__${param}`;
+    let v = parseFloat(d.Value);
+    if (["Ozone", "Total Oxides of Nitrogen", "Hydrogen Sulphide", "Total Reduced Sulphur", "Sulphur Dioxide", "Nitric Oxide", "Nitrogen Dioxide"].includes(param)) {
+      v *= 1000;
+    }
+    if (isNaN(v) || d.Value === "-888") return;
 
-    // Track most recent timestamp per station
+    const key = `${station}__${param}`;
+    live[key] = { value: v, time: dt };
+
     if (!latestTimes[station] || dt > latestTimes[station]) {
       latestTimes[station] = dt;
     }
-
-    live[key] = { value: val, time: dt };
   });
 
   let html = `<table><thead><tr><th>Station</th><th>Last Seen (MT)</th>`;
@@ -147,9 +137,8 @@ async function buildTable() {
 
       if (brokenKeys.has(key)) {
         html += `<td><span class="cell offline" title="Intentionally Offline"></span></td>`;
-      } else if (live[key] && live[key].value && live[key].value !== "-888") {
-        const val = live[key].value;
-        html += `<td><span class="cell ok" title="${val}"></span></td>`;
+      } else if (live[key]) {
+        html += `<td><span class="cell ok" title="${live[key].value}"></span></td>`;
       } else {
         html += `<td><span class="cell missing" title="Expected but not reporting"></span></td>`;
       }
@@ -162,8 +151,7 @@ async function buildTable() {
   document.getElementById("table-container").innerHTML = html;
 }
 
-
-    buildTable();
+buildTable();
   </script>
 </body>
 </html>
