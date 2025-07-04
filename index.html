@@ -22,28 +22,49 @@
       text-align: center;
     }
 
-    .cell {
-      display: inline-block;
-      width: 12px;
-      height: 12px;
-      border-radius: 50%;
-    }
-
-    .cell.ok {
-      background-color: green;
-    }
-    
-    .cell.missing {
-      background-color: red;
-    }
-    
-    .cell.offline {
-      background-color: purple;
-    }
+  .cell {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    margin-right: 3px;
+  }
+  
+  .cell.circle {
+    border-radius: 50%;
+  }
+  
+  .cell.square {
+    border-radius: 0;
+  }
+  
+  .cell.good {
+    background-color: #0072B2; /* blue */
+  }
+  
+  .cell.zero {
+    background-color: #F0E442; /* yellow */
+  }
+  
+  .cell.missing {
+    background-color: #E69F00; /* orange */
+  }
+  
+  .cell.offline {
+    background-color: purple;
+  }
   </style>
 </head>
 <body>
   <h2>Station Equipment Status Table</h2>
+
+  <div style="margin-bottom: 10px;">
+    <b>Legend:</b><br>
+    🔵 <span style="color: #0072B2;">Blue circle</span> = Good<br>
+    🟡 <span style="color: #F0E442;">Yellow circle</span> = Zero value<br>
+    🟧 <span style="color: #E69F00;">Orange square</span> = Expected but not reporting<br>
+    🟪 <span style="color: purple;">Purple square</span> = Intentionally offline
+  </div>
+  
   <div id="table-container">Loading...</div>
 
   <script>
@@ -143,12 +164,16 @@ latest.forEach(d => {
       }
 
       if (brokenKeys.has(key)) {
-        html += `<td><span class="cell offline" title="Intentionally Offline"></span></td>`;
+        html += `<td><span class="cell square offline" title="Intentionally Offline"></span></td>`;
       } else if (live[key]) {
         const val = parseFloat(live[key].value).toFixed(1);
-        html += `<td><span class="cell ok" title="${val}"></span><span style="font-size: 10px; margin-left: 3px;">${val}</span></td>`;
+        if (val === "0.0") {
+          html += `<td><span class="cell circle zero" title="Zero"></span><span style="font-size: 10px;">${val}</span></td>`;
+        } else {
+          html += `<td><span class="cell circle good" title="${val}"></span><span style="font-size: 10px;">${val}</span></td>`;
+        }
       } else {
-        html += `<td><span class="cell missing" title="Expected but not reporting"></span></td>`;
+        html += `<td><span class="cell square missing" title="Expected but not reporting"></span></td>`;
       }
     });
 
