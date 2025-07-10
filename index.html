@@ -109,6 +109,9 @@ function formatEdmontonTime(utcString) {
 }
 
 async function buildTable() {
+  const now = new Date();
+  const cutoffHours = 2; // consider "offline" if last seen > 2 hours ago
+  
   const equipment = await loadCSV("https://raw.githubusercontent.com/DKevinM/AB_datapull/main/data/equipment.csv");
   const broken = await loadCSV("https://raw.githubusercontent.com/DKevinM/AB_datapull/main/data/station_parameters.csv");
   const latest = await loadCSV("https://raw.githubusercontent.com/DKevinM/AB_datapull/main/data/last6h.csv");
@@ -152,7 +155,18 @@ latest.forEach(d => {
   html += `</tr></thead><tbody>`;
 
   stationOrder.forEach(station => {
-    html += `<tr><td>${station}</td><td>${latestTimes[station] ? formatEdmontonTime(latestTimes[station].toISOString()) : "-"}</td>`;
+    const lastSeen = latestTimes[station];
+    const ageHours = lastSeen ? (now - lastSeen) / (1000 * 60 * 60) : null;
+    const offlineFlag = ageHours !== null && ageHours > cutoffHours;
+    
+    let lastSeenCell = "-";
+    if (lastSeen) {
+      lastSeenCell = formatEdmontonTime(lastSeen.toISOString());
+      if (offlineFlag) lastSeenCell += " ⚠️";
+    }
+    
+    html += `<tr><td>${station}</td><td>${lastSeenCell}</td>`;
+
 
     parameterOrder.forEach(param => {
       const key = `${station}__${param}`;
@@ -163,8 +177,8 @@ latest.forEach(d => {
         return;
       }
 
-      if (brokenKeys.has(key)) {
-        html += `<td><span class="cell square offline" title="Intentionally Offline"></span></td>`;
+      if (brokenKeys.has(key) || offlineFlag) {
+        html += `<td><span class="cell square offline" title="Offline"></span></td>`;
       } else if (live[key]) {
         const val = parseFloat(live[key].value).toFixed(1);
         if (val === "0.0") {
